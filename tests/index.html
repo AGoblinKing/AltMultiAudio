@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MultiCanvas Tests</title>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.0.0-alpha/css/bootstrap.css">
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/mocha/1.13.0/mocha.min.css">
+    <style type="text/css">
+        body { 
+            display: flex;
+            justify-content: center;
+        }
+        .displays {
+            display: flex;
+            justify-content: center;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            cursor: pointer;
+        }
+        .center {
+            width: 900px;
+        }
+    </style>
+</head>
+<body>
+    <div class="center">
+        <div class="page-header">
+            <h1>MultiCanvas Tests</h1>
+        </div>
+        <div id="mocha" class="well"></div>
+    </div>
+    <script src="http://sdk.altvr.com/libs/three.js/r71/build/three.min.js"></script>
+    <script src="http://sdk.altvr.com/libs/altspace.js/latest/altspace.min.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mocha/1.13.0/mocha.js"></script>
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/chai/1.9.0/chai.min.js"></script>
+    <script type="text/javascript" src="../multiaudio.js"></script>
+    <script type="text/javascript">
+
+        mocha.setup("bdd");
+        window.assert = chai.assert;
+
+        describe("Chainable", function() {
+            var chained = Chainable("test");
+
+            it("should have chainable properties", function() {
+                assert.property(chained, "lift");
+                assert.property(chained, "bind");
+            });
+
+            it("should lift functions", function() {
+                chained.lift("identity", function(test) { return test; });
+                chained.lift("noop", function(test) {});
+                assert.equal(chained.identity(), "test");
+                assert.equal(chained.noop(), chained);
+            });
+
+            it("should bind functions", function() {
+                assert.equal(chained.bind(function(test) {}), chained);  
+                assert.equal(chained.bind(function(test) { return test; }), "test");
+            });
+
+            it("should accept arguments to bind", function() {
+                assert.equal(chained.bind(function(test, tester) { return tester; }, ["tester"]), "tester"); 
+            });
+
+            it("should accept arguments to lift", function() {
+                chained.lift("identities", function(test, tester) { return tester; });
+                assert.equal(chained.identities("tester"), "tester"); 
+            });
+
+            it("should have chainable lifts", function() {
+                var results = chained.lift("lift1", function(){}).lift("lift2", function(){});
+                assert.equal(results, chained);
+            });
+        });
+
+        var hostElement = document.getElementById("host"),
+            clientElement = document.getElementById("client"),
+            host = MultiCanvas(hostElement),
+            hostCtx = hostElement.getContext("2d"),
+            client = MultiCanvas(clientElement),
+            clientCtx = clientElement.getContext("2d");
+        
+        window.client = client;
+        window.host = host;
+
+        hostElement.addEventListener("click", function(e) {
+            var x = e.offsetX,
+                y = e.offsetY;
+            
+            hostCtx.strokeStyle = "rgb(0,0,200)";
+            hostCtx.strokeRect(x, y, 5, 5);
+        });
+        
+        describe("MultiCanvas", function() {
+            it("should be chainable", function() {
+                assert.property(host, "lift");
+                assert.property(host, "bind");
+            });
+
+            it("should have a host connect", function(callback) {
+                var sync = host.sync;
+                
+                host.host(1000/24).lossless = true;
+
+                sync.once("value", function(data) { 
+                    callback();
+                });
+            });
+
+            it("should draw in client when drawn in host", function(callback) {
+                hostCtx.fillStyle = "rgb(200,0,0)";  
+                hostCtx.fillRect(0, 0, 55, 50); 
+                
+                var checkData = function() {
+                    if(hostCtx.getImageData(0,0,1,1).data[0] === clientCtx.getImageData(0,0,1,1).data[0]) {
+                        callback();
+                    } else {
+                        setTimeout(checkData, 10);
+                    }
+                }
+                checkData();
+            });
+        });
+        
+        mocha.run();
+
+    </script>
+</body>
+</html>
